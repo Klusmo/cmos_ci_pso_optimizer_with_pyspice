@@ -1,27 +1,26 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from enum import Enum
 
 import PySpice.Logging.Logging as Logging
 logger = Logging.setup_logging()
 
-from PySpice.Doc.ExampleTools import find_libraries
-from PySpice.Probe.Plot import plot
-from PySpice.Spice.Library import SpiceLibrary
 from PySpice.Spice.Netlist import Circuit, SubCircuitFactory
-from PySpice.Unit import u_A, u_F, u_Hz, u_kHz, u_mV, u_mV, u_mA, u_mV, u_nA, u_Ohm, u_pF, u_s, u_uA, u_um, u_us, u_V, u_nm, u_ms, u_GHz
+from PySpice.Unit import u_Hz, u_kHz, u_mV, u_mV, u_mA, u_mV, u_pF, u_uA, u_us, u_V, u_nm, u_ms, u_GHz
+
+from utils.display_results import (
+    display_circuit,
+    display_ac_analysis_frequencies,
+    display_transient_results,
+    display_operating_point,
+    plot_transient_analisis,
+    plot_bode_analysis,
+    plot_2_bode_analysis
+)
 
 # Define the channel lenght as minimum size of of the technology (45nm)
 MINIMAL_TECNOLOGY_SIZE = (45*3)@u_nm
 MAX_CHANNEL_WIDTH = 500
-EPSILON = 10
-VDD = 5
 FITNESS_VALUES = []
-
-class TransistorType(Enum):
-    NMOS = 'nmos'
-    PMOS = 'pmos'
-
 
 class DifferentialPair(SubCircuitFactory):
     NAME = 'DifferentialPair'
@@ -94,28 +93,18 @@ def differential_pair_testbench(
 def projectedDifferentialPair(
     vdd=3,
     vcm=1.5,
-    reference_current=30@u_uA,
-    pmos_active_load_channel_width=171@u_nm,
-    pmos_active_load_channel_lenght=200@u_nm,
-    nmos_channel_width=155@u_nm,
-    nmos_channel_lenght=200@u_nm,
-    compare_with_ltspice=False
+    reference_current=30,
+    pmos_active_load_channel_width=171,
+    pmos_active_load_channel_lenght=200,
+    nmos_channel_width=155,
+    nmos_channel_lenght=200,
 ):
     """
     Runs the differential pair testbench and displays the results
     the default values are the manually projected values of the differential pair, on LTSpice
     """
-    default_values = {
-        vdd: 3,
-        vcm: 1.5,
-        reference_current: 30,
-        pmos_active_load_channel_width: 171,
-        pmos_active_load_channel_lenght: 200,
-        nmos_channel_width: 155,
-        nmos_channel_lenght: 200
-    }
 
-    circuit = differential_pair_testbench(**default_values)
+    circuit = differential_pair_testbench(**locals())
     display_circuit(circuit)
 
     print(f"Builiding Simulator")
@@ -146,41 +135,17 @@ def projectedDifferentialPair(
 
 
 def compare_diferential_pais(
-    vdd=3,
-    vcm=1.5,
-    reference_current=30,
-    pmos_active_load_channel_width=171,
-    pmos_active_load_channel_lenght=200,
-    nmos_channel_width=155,
-    nmos_channel_lenght=200,
-    compare_with_ltspice=False
+    default_values,
+    optimized_values,
 ):
     """
     Runs the differential pair testbench and displays the results
     the default values are the manually projected values of the differential pair, on LTSpice
     """
-    default_values = {
-        "vdd": 3,
-        "vcm": 1.5,
-        "reference_current": 30,
-        "pmos_active_load_channel_width": 171,
-        "pmos_active_load_channel_lenght": 200,
-        "nmos_channel_width": 155,
-        "nmos_channel_lenght": 200
-    }
-
     default_circuit = differential_pair_testbench(**default_values)
     # display_circuit(default_circuit)
 
-    circuit = differential_pair_testbench(
-        vdd=vdd,
-        vcm=vcm,
-        reference_current=reference_current,
-        pmos_active_load_channel_width=pmos_active_load_channel_width,
-        pmos_active_load_channel_lenght=pmos_active_load_channel_lenght,
-        nmos_channel_width=nmos_channel_width,
-        nmos_channel_lenght=nmos_channel_lenght
-    )
+    circuit = differential_pair_testbench(**optimized_values)
 
     print(f"          Comparing Differential Pairs")
     print(f"|{' '*40}| Projected | Optimized |")
@@ -192,7 +157,7 @@ def compare_diferential_pais(
             unit = "uA"
         else:
             unit = "nm"
-        print(f"| {key:39}| {default_values[key]:6} {unit} | {eval(key):6} {unit} |")
+        print(f"| {key:39}| {default_values[key]:6} {unit} | {optimized_values[key]:6} {unit} |")
     print()
     print("\n ------------------------------------------ \n") 
 
@@ -205,14 +170,8 @@ def compare_diferential_pais(
     
     # display_operating_point(default_op)
 
-    # plot_transient_analisis(default_transient)
-    # display_transient_results(default_transient)
+    plot_transient_analisis(default_transient)
 
-    # display_ac_analysis_frequencies(default_ac_analysis)
-    # plot_bode_analysis(default_ac_analysis)
-    # display_operating_point(op)
-
-    # plot_transient_analisis(transient)
     display_transient_results(default_transient, transient)
 
     display_ac_analysis_frequencies(default_ac_analysis, ac_analysis)
@@ -226,203 +185,14 @@ def simulator_analysis(default_simulator):
     return op,transient,ac_analysis
 
 
-def plot_bode_analysis(ac_analysis):
-    gain = np.abs(ac_analysis['vout'].as_ndarray())
-    phase = np.angle(ac_analysis['vout'].as_ndarray(), deg=True)
-    # cut-off frequency, where the gain is equal to -3 dB (1/sqrt(2)) of the maximum gain
-    cut_off_frequency = ac_analysis.frequency[np.argmax(gain < (np.max(gain) / np.sqrt(2)))]
-    # unit gain frequency, where the gain is equal to 0 dB
-    unit_gain_frequency = ac_analysis.frequency[np.argmin(np.abs(gain - 1))]
-
-    plt.figure(figsize=(10, 5))
-    plt.title('Bode Plot')
-    plt.semilogx(ac_analysis.frequency, 20*np.log10(gain), color='b')
-    plt.semilogx(ac_analysis.frequency, phase, color='b', linestyle='--')
-    plt.axvline(float(cut_off_frequency), color='r', linestyle='--')
-    plt.axvline(float(unit_gain_frequency), color='r', linestyle='--')
-    plt.text(float(cut_off_frequency)*1.5, 42, f'F-3dB: {cut_off_frequency}')
-    plt.text(float(unit_gain_frequency)*1.5, 2, f'F-0dB: {unit_gain_frequency}')
-    plt.xlabel('Frequency [Hz]')
-    plt.ylabel('Gain [dB]')
-    plt.grid()
-    plt.show()
-
-def plot_2_bode_analysis(default_ac_analysis, ac_analysis):
-    gain = np.abs(ac_analysis['vout'].as_ndarray())
-    phase = np.angle(ac_analysis['vout'].as_ndarray(), deg=True)
-    # cut-off frequency, where the gain is equal to -3 dB (1/sqrt(2)) of the maximum gain
-    cut_off_frequency = ac_analysis.frequency[np.argmax(gain < (np.max(gain) / np.sqrt(2)))]
-    # unit gain frequency, where the gain is equal to 0 dB
-    unit_gain_frequency = ac_analysis.frequency[np.argmin(np.abs(gain - 1))]
-
-    default_gain = np.abs(default_ac_analysis['vout'].as_ndarray())
-    default_phase = np.angle(default_ac_analysis['vout'].as_ndarray(), deg=True)
-    default_cut_off_frequency = default_ac_analysis.frequency[np.argmax(default_gain < (np.max(default_gain) / np.sqrt(2)))]
-    default_unit_gain_frequency = default_ac_analysis.frequency[np.argmin(np.abs(default_gain - 1))]
-
-    plt.figure(figsize=(16, 8))
-    plt.subplot(2, 1, 1)
-    plt.title('Comparação diagrama de Bode - Manual x Otimizado')
-    plt.semilogx(default_ac_analysis.frequency, 20*np.log10(gain), color='b')
-    plt.semilogx(default_ac_analysis.frequency, default_phase, color='b', linestyle='--')
-    plt.axvline(float(default_cut_off_frequency), color='r', linestyle='--')
-    plt.axvline(float(default_unit_gain_frequency), color='r', linestyle='--')
-    plt.text(float(default_cut_off_frequency)*1.5, 40, f'f_H: {float(default_cut_off_frequency):.2f}', fontsize=8)
-    plt.text(float(default_unit_gain_frequency)*1.5, 0, f'f_u: {float(default_unit_gain_frequency):.2f}', fontsize=8)
-    plt.legend(['Manual'])
-    
-    plt.subplot(2, 1, 2)
-    plt.semilogx(ac_analysis.frequency, 20*np.log10(gain), color='b')
-    plt.semilogx(ac_analysis.frequency, phase, color='b', linestyle='--')
-    plt.axvline(float(cut_off_frequency), color='r', linestyle='--')
-    plt.axvline(float(unit_gain_frequency), color='r', linestyle='--')
-    plt.text(float(cut_off_frequency)*1.5, 40, f'f_H: {float(cut_off_frequency):.2f}', fontsize=8)
-    plt.text(float(unit_gain_frequency)*1.5, 0, f'f_u: {float(unit_gain_frequency):.2f}', fontsize=8)
-    plt.xlabel('Frequência [Hz]')
-    plt.ylabel('Ganho [dB]')
-    plt.legend(['Otimizado'])
-    plt.show()
-
-
-def display_ac_analysis_frequencies(projected_ac_analysis, ac_analysis=None):
-    if ac_analysis is None:
-        projected_gain = np.abs(projected_ac_analysis['vout'].as_ndarray())
-        # cut-off frequency, where the gain is equal to -3 dB (1/sqrt(2)) of the maximum gain
-        projected_cut_off_frequency = projected_ac_analysis.frequency[np.argmax(projected_gain < (np.max(projected_gain) / np.sqrt(2)))]
-        # unit gain frequency, where the gain is equal to 0 dB
-        projected_unit_gain_frequency = projected_ac_analysis.frequency[np.argmin(np.abs(projected_gain - 1))]
-
-        print("    AC Analysis")
-        print("    Calculating the cut-off frequency and unit gain frequency")
-        print(f"    Cut-off Frequency: {projected_cut_off_frequency}")
-        print(f"    Unit Gain Frequency: {projected_unit_gain_frequency}")
-        print("\n ------------------------------------------ \n")
-    else:
-        gain = np.abs(ac_analysis['vout'].as_ndarray())
-        # cut-off frequency, where the gain is equal to -3 dB (1/sqrt(2)) of the maximum gain
-        cut_off_frequency = ac_analysis.frequency[np.argmax(gain < (np.max(gain) / np.sqrt(2)))]
-        # unit gain frequency, where the gain is equal to 0 dB
-        unit_gain_frequency = ac_analysis.frequency[np.argmin(np.abs(gain - 1))]
-
-        projected_gain = np.abs(projected_ac_analysis['vout'].as_ndarray())
-        # cut-off frequency, where the gain is equal to -3 dB (1/sqrt(2)) of the maximum gain
-        projected_cut_off_frequency = projected_ac_analysis.frequency[np.argmax(projected_gain < (np.max(projected_gain) / np.sqrt(2)))]
-        # unit gain frequency, where the gain is equal to 0 dB
-        projected_unit_gain_frequency = projected_ac_analysis.frequency[np.argmin(np.abs(projected_gain - 1))]
-
-        print("    AC Analysis")
-        print("    Comparing the cut-off frequency and unit gain frequency")
-        print()
-        print(f"    Projected Cut-off Frequency: {projected_cut_off_frequency}")
-        print(f"    Projected Unit Gain Frequency: {projected_unit_gain_frequency}")
-        print()
-        print(f"    Optimized Cut-off Frequency: {cut_off_frequency}")
-        print(f"    Optimized Unit Gain Frequency: {unit_gain_frequency}")
-        print("\n ------------------------------------------ \n")
-
-
-def display_transient_results(projected_transient, transient=None):
-    if transient is None:
-        vout_delta = np.abs(np.max(projected_transient['vout']) - np.min(projected_transient['vout']))
-        vin_diff = projected_transient['vin_plus'] - projected_transient['vin_minus']
-        vin_diff_delta = np.abs(np.max(vin_diff) - np.min(vin_diff))
-        gain = vout_delta/vin_diff_delta
-
-        print(f"   Projected Gain: {gain}")
-        print("\n ------------------------------------------ \n")
-    else:
-        vin_diff = transient['vin_plus'] - transient['vin_minus']
-        vout_delta = np.abs(np.max(transient['vout']) - np.min(transient['vout']))
-        vin_diff_delta = np.abs(np.max(vin_diff) - np.min(vin_diff))
-        gain = vout_delta/vin_diff_delta
-
-        projected_vin_diff = projected_transient['vin_plus'] - projected_transient['vin_minus']
-        projected_vout_delta = np.abs(np.max(projected_transient['vout']) - np.min(projected_transient['vout']))
-        projected_vin_diff_delta = np.abs(np.max(projected_vin_diff) - np.min(projected_vin_diff))
-        projected_gain = projected_vout_delta/projected_vin_diff_delta
-
-        # print("Transient analysis")
-        # print(f"Vout Delta: {vout_delta}")
-        # print(f"Vin Diff Delta: {vin_diff_delta}")
-        print(f"   Projected Gain: {projected_gain}")
-        print(f"   Optimized Gain: {gain}")
-        print("\n ------------------------------------------ \n")
-
-
-def display_operating_point(default_op, op=None):
-    if op is None:
-        print("\n ------------------------------------------ \n")
-        print("         Operating Point")
-        for node in default_op.nodes:
-            print(f"Node: {node} - {default_op[node][0]}")
-        print()
-        for branch in default_op.branches.values():
-            print(f"Branch: {branch} - {branch[0]}")
-
-        print("\n ------------------------------------------ \n")
-    else:
-        print("\n ------------------------------------------ \n")
-        print("         Comparing Operating Point")
-        # build the comparison table
-        print("|        Nodes        | Default OP | Current OP |")
-        print("|---------------------|------------|------------|")
-        for node in default_op.nodes:
-            print(f"| {node:20}| {default_op[node][0].value:>10.2f} | {op[node][0].value:>10.2f} |")
-
-        print()
-        print("|       Branches      | Default OP | Current OP |")
-        print("|---------------------|------------|------------|")
-        for branch in default_op.branches:
-            print(f"| {branch:20}| {default_op.branches[branch][0].value:>10.2e} | {op.branches[branch][0].value:>10.2e} |")
-        print("\n ------------------------------------------ \n")
-
-
-def display_circuit(circuit):
-    print("\n ------------------------------------------ \n")
-    print(f"Differential Pair Circuit: ")
-    print(circuit)
-    print("\n ------------------------------------------ \n")
-
-
-def plot_transient_analisis(default_analysis, analysis=None):
-    if analysis is None:
-        input_signal = default_analysis['vin_plus'] - default_analysis['vin_minus']
-        plt.figure(figsize=(10, 5))
-        plt.subplot(2, 1, 1)
-        plt.title('Vin Plus')
-        plt.plot(default_analysis.time, input_signal)
-        plt.xlabel('Time [s]')
-        plt.ylabel('Vin Plus [V]')
-        plt.grid()
-        plt.subplot(2, 1, 2)
-        plt.title('Vout')
-        plt.plot(default_analysis.time, default_analysis['vout'])
-        plt.xlabel('Time [s]')
-        plt.ylabel('Vout [V]')
-        plt.grid()
-        plt.show()
-    else:
-        dft_input_signal = default_analysis['vin_plus'] - default_analysis['vin_minus']
-        input_signal = analysis['vin_plus'] - analysis['vin_minus']
-        plt.figure(figsize=(10, 5))
-        plt.subplot(2, 1, 1)
-        plt.title('Vin Plus')
-        plt.plot(default_analysis.time, dft_input_signal, label='Default', color='b')
-        plt.plot(default_analysis.time, input_signal, label='Current', color='r', linestyle='--')
-        plt.xlabel('Time [s]')
-        plt.ylabel('Vin Plus [V]')
-        plt.grid()
-        plt.subplot(2, 1, 2)
-        plt.title('Vout')
-        plt.plot(default_analysis.time, default_analysis['vout'], label='Default', color='b')
-        plt.plot(default_analysis.time, analysis['vout'], label='Current', color='r', linestyle='--')
-        plt.xlabel('Time [s]')
-        plt.ylabel('Vout [V]')
-        plt.grid()
-        plt.show()
-
-
-def particle_swarm_optimization(parameters: dict):
+def particle_swarm_optimization(
+        parameters: dict,
+        n_particles: int = 6,
+        n_iterations: int = 100,
+        w: float = 0.5,
+        c1: float = 2,
+        c2: float = 1.5,
+    ):
     """
     This function will optimize the channel width of the CMOS inverter using a particle swarm optimization algorithm
     """
@@ -432,29 +202,11 @@ def particle_swarm_optimization(parameters: dict):
     search_space = np.array(params_ranges)
     
     best_fitness_per_epoch = []
-
-    # Define the number of particles
-    n_particles = 6
-
-    # Define the number of iterations
-    n_iterations = 100
-
-    # Define the inertia weight
-    w = 0.5
-
-    # Define the cognitive weight
-    c1 = 2
-
-    # Define the social weight
-    c2 = 1.5
-
-    # Initialize the particles, each assumed value is a integer
+    # Initialize the particles
     particles = np.random.randint(search_space[:, 0], search_space[:, 1], (n_particles, search_space.shape[0]))
 
     # Initialize the best position of the particles
     best_positions = particles.copy()
-
-    # Initialize the best global position
     best_global_position = particles[np.argmin(fitness(particle) for particle in particles)]
     best_global_fitness : np.float64 = np.inf
 
@@ -618,6 +370,7 @@ def display_best_results(best_global_position, best_fitness_per_epoch):
     print(f"Best Global Fitness: {best_fitness_per_epoch[-1]}")
     print("\n ------------------------------------------ \n")
 
+
 def epoch_convergence(parameters):
     pso_results = []
     for i in range(30):
@@ -641,17 +394,21 @@ def epoch_convergence(parameters):
     # Beast Global Position Mean: [  2.06666667  18.26666667 176.7        135.        ]
     # Best Fitness Epoch Mean: 17.366666666666667
 
+
 def optimize_differential_pair():
-    MINIMAL_TECNOLOGY_SIZE = (45*3)@u_nm
+    MINIMAL_TECNOLOGY_SIZE = 45*3
     MAX_CHANNEL_WIDTH = 200
 
     parameters = {
         'vdd': (1, 5),
         'reference_current': (30, 31),
-        'pmos_active_load_channel_width': (MINIMAL_TECNOLOGY_SIZE.value, MAX_CHANNEL_WIDTH),
-        'nmos_channel_width': (MINIMAL_TECNOLOGY_SIZE.value, MAX_CHANNEL_WIDTH),
+        'pmos_active_load_channel_width': (MINIMAL_TECNOLOGY_SIZE, MAX_CHANNEL_WIDTH),
+        'nmos_channel_width': (MINIMAL_TECNOLOGY_SIZE, MAX_CHANNEL_WIDTH),
     }
-    best_global_position, best_fitness_per_epoch = particle_swarm_optimization(parameters)
+    best_global_position, best_fitness_per_epoch = particle_swarm_optimization(
+        
+        parameters
+    )
 
     display_best_results(best_global_position, best_fitness_per_epoch)
     fitness(best_global_position, display=True)
@@ -659,55 +416,59 @@ def optimize_differential_pair():
 
 
 if __name__ == '__main__':
-    # projectedDifferentialPair()
+    manualy_projected = {
+        "vdd": 3,
+        "vcm": 1.5,
+        "reference_current": 30,
+        "pmos_active_load_channel_width": 171,
+        "pmos_active_load_channel_lenght": 200,
+        "nmos_channel_width": 155,
+        "nmos_channel_lenght": 200
+    }
+
+    # projectedDifferentialPair(**manualy_projected)
     # optimize_differential_pair()
 
 
-    """
-    OPTIMIZATION RESULTS
-
-    ------------------------------------------
-
-    Best Global Position:
-    VDD: 3
-    Reference Current: 30
-    PMOS Active Load Channel Width: 172
-    NMOS Channel Width: 168
-    Best Global Fitness: 10.799201623816963
-
-    ------------------------------------------
-
-
-    ------------------------------------------
-
-    VDD: 3
-    Reference Current: 30
-    PMOS Active Load Channel Width: 172
-    NMOS Channel Width: 168
-
-    Vout: 1.5015847518043657
-    Gain: 60.66858609463531
-    Cut-off Frequency: 7943.2823472428345 Hz
-    Unit Gain Frequency: 794328.2347242847 Hz
-    Area: 68000
-
-    Polarization Fitness: 1.5847518043656805
-    Gain Fitness: 3.296598995862955
-    Cut-off Fitness: 1.2589254117941642
-    Unit Gain Fitness: 1.2589254117941622
-    Area: 3.4000000000000004
-
-    ------------------------------------------
-
 
     """
+    OPTIMIZATION RESULTS:
+        Best Global Position:
+        VDD: 3
+        Reference Current: 30
+        PMOS Active Load Channel Width: 172
+        NMOS Channel Width: 168
+        Best Global Fitness: 10.799201623816963
+
+        VDD: 3
+        Reference Current: 30
+        PMOS Active Load Channel Width: 172
+        NMOS Channel Width: 168
+
+        Vout: 1.5015847518043657
+        Gain: 60.66858609463531
+        Cut-off Frequency: 7943.2823472428345 Hz
+        Unit Gain Frequency: 794328.2347242847 Hz
+        Area: 68000
+
+        Polarization Fitness: 1.5847518043656805
+        Gain Fitness: 3.296598995862955
+        Cut-off Fitness: 1.2589254117941642
+        Unit Gain Fitness: 1.2589254117941622
+        Area: 3.4000000000000004
+    """
+
+    optimized_project = {
+        "vdd": 3,
+        "vcm": 1.5,
+        "reference_current": 30,
+        "pmos_active_load_channel_width": 172,
+        "pmos_active_load_channel_lenght": 200,
+        "nmos_channel_width": 168,
+        "nmos_channel_lenght": 200
+    }
+
     compare_diferential_pais(
-        vdd=3,
-        vcm=1.5,
-        reference_current=30,
-        pmos_active_load_channel_width=172,
-        pmos_active_load_channel_lenght=200,
-        nmos_channel_width=168,
-        nmos_channel_lenght=200,
-        compare_with_ltspice=False
+        default_values=manualy_projected,
+        optimized_values=optimized_project
     )
