@@ -1,8 +1,11 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import logging
 
 import PySpice.Logging.Logging as Logging
 logger = Logging.setup_logging()
+logging.getLogger('PySpice.Spice.NgSpice.Shared.NgSpiceShared').setLevel(logging.CRITICAL)
+
 
 from PySpice.Spice.Netlist import Circuit, SubCircuitFactory
 from PySpice.Unit import u_Hz, u_kHz, u_mV, u_mV, u_mA, u_mV, u_pF, u_uA, u_us, u_V, u_nm, u_ms, u_GHz
@@ -215,13 +218,10 @@ def particle_swarm_optimization(
 
     same_result_count = 0
     for iteration in range(n_iterations):
-        # print(f'Iteration: {iteration}/{n_iterations}')
-        # print(f'Best Global Fitness: {best_global_fitness}')
-        # print(f'Best Global Position: {best_global_position}')
-        # print('')
+        print(f'[{iteration}|{n_iterations}] - Best Global Fitness: {best_global_fitness:.2f} - Position: {best_global_position}', end='\r')
 
-        if same_result_count > 20:
-            break
+        # if same_result_count > 20:
+        #     break
         
         best_iteration_fitness : np.float64 = best_global_fitness
         best_iteration_position = best_global_position
@@ -254,6 +254,7 @@ def particle_swarm_optimization(
         else:
             same_result_count += 1    
 
+    print(f'\n[{iteration}|{n_iterations}] - Best Global Fitness: {best_global_fitness:.2f} - Position: {best_global_position}\n')
     return best_global_position, best_fitness_per_epoch
 
 
@@ -315,12 +316,12 @@ def fitness(particle, display=False):
         1000, 
         200, 
         10000, 
-        1000000,
+        100000,
         1/20000
     ]
 
     if display:
-        print("\n ------------------------------------------ \n")
+        print("------------------------------------------ ")
         print(f"VDD: {particle[0]}")
         print(f"Reference Current: {particle[1]}")
         print(f"PMOS Active Load Channel Width: {particle[2]}")
@@ -339,7 +340,6 @@ def fitness(particle, display=False):
         print(f"Cut-off Fitness: {cut_off_fitness * weights[2]}")
         print(f"Unit Gain Fitness: {unit_gain_fitness * weights[3]}")
         print(f"Area: {area * weights[4]}")       
-        print("\n ------------------------------------------ \n")
 
 
     return (
@@ -361,14 +361,13 @@ def plot_epochs(best_fitness_per_epoch):
 
 
 def display_best_results(best_global_position, best_fitness_per_epoch):
-    print("\n ------------------------------------------ \n")
+    print("------------------------------------------ ")
     print(f"Best Global Position: ")
     print(f"VDD: {best_global_position[0]}")
     print(f"Reference Current: {best_global_position[1]}")
     print(f"PMOS Active Load Channel Width: {best_global_position[2]}")
     print(f"NMOS Channel Width: {best_global_position[3]}")
     print(f"Best Global Fitness: {best_fitness_per_epoch[-1]}")
-    print("\n ------------------------------------------ \n")
 
 
 def epoch_convergence(parameters):
@@ -405,10 +404,7 @@ def optimize_differential_pair():
         'pmos_active_load_channel_width': (MINIMAL_TECNOLOGY_SIZE, MAX_CHANNEL_WIDTH),
         'nmos_channel_width': (MINIMAL_TECNOLOGY_SIZE, MAX_CHANNEL_WIDTH),
     }
-    best_global_position, best_fitness_per_epoch = particle_swarm_optimization(
-        
-        parameters
-    )
+    best_global_position, best_fitness_per_epoch = particle_swarm_optimization(parameters)
 
     display_best_results(best_global_position, best_fitness_per_epoch)
     fitness(best_global_position, display=True)
@@ -427,9 +423,7 @@ if __name__ == '__main__':
     }
 
     # projectedDifferentialPair(**manualy_projected)
-    # optimize_differential_pair()
-
-
+    optimize_differential_pair()
 
     """
     OPTIMIZATION RESULTS:
@@ -468,7 +462,7 @@ if __name__ == '__main__':
         "nmos_channel_lenght": 200
     }
 
-    compare_diferential_pais(
-        default_values=manualy_projected,
-        optimized_values=optimized_project
-    )
+    # compare_diferential_pais(
+    #     default_values=manualy_projected,
+    #     optimized_values=optimized_project
+    # )
